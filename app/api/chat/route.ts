@@ -1,8 +1,4 @@
-NextRequest, NextResponse } from 'next/server'
-
-// ============================================================
-// TIPOS
-// ============================================================
+import { NextRequest, NextResponse } from 'next/server'
 
 type Mensagem = { role: 'user' | 'assistant'; content: string }
 
@@ -47,10 +43,6 @@ type GeminiAnalise = {
   emocao_detectada?: string
 }
 
-// ============================================================
-// GEMINI — analisa intenção (gratuito)
-// ============================================================
-
 async function analisarComGemini(mensagem: string, perfil: PerfilUsuario, historico: Mensagem[]): Promise<GeminiAnalise> {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) return { intencao: 'conversa', deveCriarApp: false, deveUsarGroqCompleto: true, resumo: mensagem }
@@ -91,10 +83,6 @@ REGRAS: deveCriarApp=true se pedir app/ferramenta/jogo/sistema. deveUsarGroqComp
   }
 }
 
-// ============================================================
-// GROQ — resposta simples (llama-3.1-8b — rápido)
-// ============================================================
-
 async function groqSimples(mensagem: string, perfil: PerfilUsuario, historico: Mensagem[]): Promise<string> {
   const faseVoz: Record<string,string> = {
     nascimento: 'Curioso e cauteloso. Perguntas suaves.',
@@ -122,10 +110,6 @@ async function groqSimples(mensagem: string, perfil: PerfilUsuario, historico: M
   const data = await res.json()
   return data.choices?.[0]?.message?.content || 'Entendido!'
 }
-
-// ============================================================
-// GROQ — modo completo: perfil + apps + JSON (llama-3.3-70b)
-// ============================================================
 
 async function groqCompleto(mensagem: string, perfil: PerfilUsuario, historico: Mensagem[], analise: GeminiAnalise): Promise<RespostaIA> {
   const faseVoz: Record<string,string> = {
@@ -178,20 +162,14 @@ newApp: {"name":"nome","icon":"emoji","desc":"desc","html":"<!DOCTYPE html>...HT
   return { message: 'Processando...', updates: {} }
 }
 
-// ============================================================
-// ROTA PRINCIPAL
-// ============================================================
-
 export async function POST(request: NextRequest) {
   try {
     const { mensagem, perfil, historico = [] }: { mensagem: string; perfil: PerfilUsuario; historico: Mensagem[] } = await request.json()
 
     if (!mensagem?.trim()) return NextResponse.json({ error: 'Mensagem vazia' }, { status: 400 })
 
-    // 1. Gemini analisa intenção
     const analise = await analisarComGemini(mensagem, perfil, historico)
 
-    // 2. Roteamento
     let resposta: RespostaIA
     if (analise.deveUsarGroqCompleto || analise.deveCriarApp) {
       resposta = await groqCompleto(mensagem, perfil, historico, analise)
@@ -200,7 +178,6 @@ export async function POST(request: NextRequest) {
       resposta = { message: texto, updates: { knowledgeGain: 2, niches: analise.nichos_detectados || {}, newMemory: analise.aprendizados?.[0] || null } }
     }
 
-    // 3. Enriquecer com Gemini
     if (resposta.updates) {
       if (!resposta.updates.newMemory && analise.aprendizados?.[0]) resposta.updates.newMemory = analise.aprendizados[0]
       if (!resposta.updates.niches && analise.nichos_detectados) resposta.updates.niches = analise.nichos_detectados
